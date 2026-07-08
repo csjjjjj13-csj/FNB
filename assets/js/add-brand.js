@@ -1,372 +1,309 @@
-// ---- tabs ----
-function initTabs(tabsId) {
-  document.getElementById(tabsId).addEventListener('click', e => {
-    const btn = e.target.closest('.tab-btn');
-    if (!btn) return;
-    document.querySelectorAll(`#${tabsId} .tab-btn`).forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
-  });
-}
+// ---- state ----
+const editSlug = new URLSearchParams(location.search).get('edit');
+let originalSlug = editSlug || null;
+const repeaters = {}; // key -> { getRows(), setRows(rows) }
+let logoPath = '';
 
 function currentSlug() {
   return document.getElementById('f-slug').value.trim();
 }
 
-// ---- single image field (logo) ----
-function createImageField(containerId, initialValue) {
-  const container = document.getElementById(containerId);
-  container.innerHTML = '';
-  const row = document.createElement('div');
-  row.className = 'image-field-row';
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
-  const preview = document.createElement('img');
-  preview.className = 'image-field-preview';
+// ---- tab switching ----
+document.getElementById('form-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  document.querySelectorAll('#form-tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.form-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelector(`.form-panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+});
 
-  const textInput = document.createElement('input');
-  textInput.type = 'text';
-  textInput.placeholder = '이미지 경로 또는 URL (파일 업로드시 자동 입력)';
+// ---- mini field renderers used inside repeater rows ----
+function renderTextMiniField(row, f) {
+  const wrap = document.createElement('div');
+  const label = document.createElement('label');
+  label.textContent = f.label || f.key;
+  const input = document.createElement(f.type === 'textarea' ? 'textarea' : 'input');
+  if (f.type === 'number') input.type = 'number';
+  else if (f.type === 'color') input.type = 'color';
+  else if (input.tagName === 'INPUT') input.type = 'text';
+  if (f.placeholder) input.placeholder = f.placeholder;
+  input.value = row[f.key] ?? (f.type === 'color' ? '#8B3A2F' : '');
+  input.addEventListener('input', () => {
+    row[f.key] = f.type === 'number' ? Number(input.value) : input.value;
+  });
+  wrap.append(label, input);
+  return wrap;
+}
 
+function renderImageMiniField(row, f) {
+  const wrap = document.createElement('div');
+  wrap.className = 'image-field-mini';
+  const labelEl = document.createElement('label');
+  labelEl.textContent = f.label || '이미지';
+  const preview = document.createElement('div');
+  function refresh() {
+    preview.innerHTML = row[f.key]
+      ? `<img class="thumb" src="${row[f.key]}" alt="">`
+      : '<span class="hint">등록된 이미지 없음</span>';
+  }
+  refresh();
   const fileLabel = document.createElement('label');
   fileLabel.className = 'btn btn-sm file-upload-btn';
-  fileLabel.textContent = '파일 선택';
+  fileLabel.textContent = '이미지 선택';
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'image/*';
   fileInput.style.display = 'none';
   fileLabel.appendChild(fileInput);
-
-  const status = document.createElement('span');
-  status.className = 'hint';
-
-  function setValue(v) {
-    textInput.value = v || '';
-    if (v) { preview.src = v; preview.style.display = 'block'; }
-    else { preview.style.display = 'none'; }
-  }
-  setValue(initialValue);
-
-  textInput.addEventListener('input', () => setValue(textInput.value));
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file) return;
-    status.textContent = '업로드 중...';
+    if (!currentSlug()) { alert('먼저 기본정보 탭에서 슬러그를 입력해주세요.'); fileInput.value = ''; return; }
+    fileLabel.textContent = '업로드중...';
     try {
       const path = await uploadImageFile(file, currentSlug());
-      setValue(path);
-      status.textContent = '업로드 완료';
-      setTimeout(() => { status.textContent = ''; }, 1500);
+      row[f.key] = path;
+      refresh();
     } catch (e) {
-      status.textContent = '업로드 실패: ' + e.message;
+      alert('이미지 업로드 실패: ' + e.message);
     }
+    fileLabel.textContent = '이미지 선택';
     fileInput.value = '';
   });
-
-  row.append(preview, textInput, fileLabel, status);
-  container.appendChild(row);
-  return { getValue: () => textInput.value.trim() };
+  wrap.append(labelEl, preview, fileLabel);
+  return wrap;
 }
 
-// ---- generic repeatable-row helper (supports text / number / color / textarea / image / file fields) ----
-function makeRepeater(containerId, addBtnId, fields, initialRows = []) {
-  const container = document.getElementById(containerId);
-  let rows = initialRows.length ? initialRows.map(r => ({ ...r })) : [];
-
-  function renderImageMiniField(row, f) {
-    const wrap = document.createElement('div');
-    wrap.className = 'image-field-mini';
-    const preview = document.createElement('img');
-    preview.className = 'image-field-preview-sm';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = f.placeholder || '이미지 경로/URL';
-    input.value = row[f.key] ?? '';
-
-    function refresh() {
-      if (input.value) { preview.src = input.value; preview.style.display = 'block'; }
-      else { preview.style.display = 'none'; }
+function renderFileMiniField(row, f) {
+  const wrap = document.createElement('div');
+  wrap.className = 'file-field-mini';
+  const labelEl = document.createElement('label');
+  labelEl.textContent = f.label || '파일';
+  const info = document.createElement('div');
+  info.className = 'file-field-info';
+  function refresh() {
+    if (row[f.key]) {
+      const name = decodeURIComponent(String(row[f.key]).split('/').pop());
+      info.innerHTML = `📄 <a href="${row[f.key]}" target="_blank" rel="noopener">${name}</a>`;
+    } else {
+      info.textContent = '등록된 파일 없음';
     }
-    refresh();
-
-    input.addEventListener('input', () => { row[f.key] = input.value; refresh(); });
-
-    const fileLabel = document.createElement('label');
-    fileLabel.className = 'btn btn-sm file-upload-btn';
-    fileLabel.textContent = '파일';
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.style.display = 'none';
-    fileLabel.appendChild(fileInput);
-
-    fileInput.addEventListener('change', async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      fileLabel.textContent = '업로드중...';
-      try {
-        const path = await uploadImageFile(file, currentSlug());
-        row[f.key] = path;
-        input.value = path;
-        refresh();
-      } catch (e) {
-        alert('이미지 업로드 실패: ' + e.message);
-      }
-      fileLabel.textContent = '파일';
-      fileInput.value = '';
-    });
-
-    const labelEl = document.createElement('label');
-    labelEl.textContent = f.label || '이미지';
-    wrap.append(labelEl, preview, input, fileLabel);
-    return wrap;
   }
-
-  function renderFileMiniField(row, f) {
-    const wrap = document.createElement('div');
-    wrap.className = 'file-field-mini';
-
-    const labelEl = document.createElement('label');
-    labelEl.textContent = f.label || '파일';
-
-    const info = document.createElement('div');
-    info.className = 'file-field-info';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = f.placeholder || '파일 경로/URL';
-    input.value = row[f.key] ?? '';
-
-    function refresh() {
-      if (input.value) {
-        const name = decodeURIComponent(input.value.split('/').pop());
-        info.innerHTML = `📄 <a href="${input.value}" target="_blank" rel="noopener">${name}</a>`;
-      } else {
-        info.textContent = '등록된 파일 없음';
-      }
+  refresh();
+  const fileLabel = document.createElement('label');
+  fileLabel.className = 'btn btn-sm file-upload-btn';
+  fileLabel.textContent = '파일 선택';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = f.accept || '';
+  fileInput.style.display = 'none';
+  fileLabel.appendChild(fileInput);
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    if (!currentSlug()) { alert('먼저 기본정보 탭에서 슬러그를 입력해주세요.'); fileInput.value = ''; return; }
+    fileLabel.textContent = '업로드중...';
+    try {
+      const path = await uploadPresentationFile(file, currentSlug());
+      row[f.key] = path;
+      refresh();
+    } catch (e) {
+      alert('파일 업로드 실패: ' + e.message);
     }
-    refresh();
-
-    input.addEventListener('input', () => { row[f.key] = input.value; refresh(); });
-
-    const fileLabel = document.createElement('label');
-    fileLabel.className = 'btn btn-sm file-upload-btn';
     fileLabel.textContent = '파일 선택';
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = f.accept || '';
-    fileInput.style.display = 'none';
-    fileLabel.appendChild(fileInput);
+    fileInput.value = '';
+  });
+  wrap.append(labelEl, info, fileLabel);
+  return wrap;
+}
 
-    fileInput.addEventListener('change', async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      fileLabel.textContent = '업로드중...';
-      try {
-        const path = await uploadPresentationFile(file, currentSlug());
-        row[f.key] = path;
-        input.value = path;
-        refresh();
-      } catch (e) {
-        alert('파일 업로드 실패: ' + e.message);
-      }
-      fileLabel.textContent = '파일 선택';
-      fileInput.value = '';
-    });
+function renderMiniField(row, f) {
+  if (f.type === 'image') return renderImageMiniField(row, f);
+  if (f.type === 'file') return renderFileMiniField(row, f);
+  return renderTextMiniField(row, f);
+}
 
-    wrap.append(labelEl, info, input, fileLabel);
-    return wrap;
-  }
+// ---- generic repeater builder (object rows) ----
+function makeRepeater(containerId, addBtnId, fields, initialRows) {
+  const container = document.getElementById(containerId);
+  let rows = (initialRows || []).map(r => ({ ...r }));
 
-  function renderRow(row) {
-    const div = document.createElement('div');
-    div.className = 'repeat-row';
-    fields.forEach(f => {
-      if (f.type === 'image') {
-        div.appendChild(renderImageMiniField(row, f));
-        return;
-      }
-      if (f.type === 'file') {
-        div.appendChild(renderFileMiniField(row, f));
-        return;
-      }
-      const wrap = document.createElement('div');
-      wrap.className = 'labeled-input';
-      const labelEl = document.createElement('label');
-      labelEl.textContent = f.label || f.placeholder || '';
-      const input = document.createElement(f.type === 'textarea' ? 'textarea' : 'input');
-      if (f.type && f.type !== 'textarea') input.type = f.type;
-      input.placeholder = f.placeholder || '';
-      input.value = row[f.key] ?? '';
-      input.addEventListener('input', () => { row[f.key] = input.value; });
-      wrap.append(labelEl, input);
-      div.appendChild(wrap);
-    });
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-btn';
-    removeBtn.type = 'button';
-    removeBtn.textContent = '✕';
-    removeBtn.addEventListener('click', () => {
-      rows = rows.filter(r => r !== row);
-      renderAll();
-    });
-    div.appendChild(removeBtn);
-    return div;
-  }
-
-  function renderAll() {
+  function renderRows() {
     container.innerHTML = '';
-    rows.forEach(row => container.appendChild(renderRow(row)));
+    rows.forEach((row, idx) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'repeater-row';
+      const fieldsWrap = document.createElement('div');
+      fieldsWrap.className = 'row-fields';
+      fields.forEach(f => fieldsWrap.appendChild(renderMiniField(row, f)));
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-row-btn';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', () => {
+        rows.splice(idx, 1);
+        renderRows();
+      });
+      rowEl.append(fieldsWrap, removeBtn);
+      container.appendChild(rowEl);
+    });
+    if (!rows.length) {
+      container.innerHTML = '<p class="hint">아직 추가된 항목이 없습니다.</p>';
+    }
   }
 
   document.getElementById(addBtnId).addEventListener('click', () => {
-    const blank = {};
-    fields.forEach(f => blank[f.key] = '');
-    rows.push(blank);
-    renderAll();
+    rows.push({});
+    renderRows();
   });
 
-  renderAll();
+  renderRows();
+
   return {
-    getRows: () => rows.filter(r => Object.values(r).some(v => String(v).trim() !== '')),
+    getRows: () => rows.filter(r => Object.values(r).some(v => v !== undefined && v !== '')),
+    setRows: (newRows) => { rows = (newRows || []).map(r => ({ ...r })); renderRows(); },
   };
 }
 
-// ---- field definitions (shared by create + edit) ----
-const COLOR_FIELDS = [
-  { key: 'name', label: '색상 이름', placeholder: '예: 다크우드' },
-  { key: 'hex', label: '색상값', placeholder: '#4A3728', type: 'color' },
-  { key: 'usage', label: '용도', placeholder: '예: 메인 배경' },
-];
-const SUB_FIELDS = [{ key: 'text', label: '보조 카피', placeholder: '보조 카피 문구' }];
-const MENU_FIELDS = [
-  { key: 'name', label: '메뉴명', placeholder: '예: 보쌈쟁반' },
-  { key: 'price', label: '판매가(원)', placeholder: '예: 12900', type: 'number' },
-  { key: 'cost', label: '원가(원)', placeholder: '예: 4600', type: 'number' },
-  { key: 'desc', label: '설명', placeholder: '메뉴 구성 설명' },
-  { key: 'image', label: '메뉴 사진', type: 'image' },
-];
-const SEASON_FIELDS = [
-  { key: 'season', label: '지역/테마', placeholder: '예: 강원' },
-  { key: 'name', label: '메뉴명', placeholder: '예: 강원 메밀감자 쟁반' },
-  { key: 'period', label: '운영 시기', placeholder: '예: 2026-08' },
-  { key: 'desc', label: '설명', placeholder: '메뉴 설명' },
-  { key: 'image', label: '메뉴 사진', type: 'image' },
-];
-const EVENT_FIELDS = [
-  { key: 'title', label: '이벤트명', placeholder: '예: 오픈 기념 이벤트' },
-  { key: 'period', label: '기간', placeholder: '예: 2026-08' },
-  { key: 'desc', label: '설명', placeholder: '이벤트 설명' },
-];
-const BRANDIMAGE_FIELDS = [
-  { key: 'image', label: '이미지', type: 'image' },
-  { key: 'caption', label: '설명/캡션', placeholder: '예: 매장 전경' },
-];
-const PRESENTATION_FIELDS = [
-  { key: 'title', label: '자료명', placeholder: '예: 쟁반집 사업계획서' },
-  { key: 'path', label: 'PPT 파일', type: 'file', accept: '.ppt,.pptx' },
-];
+// ---- simple string-list repeater (e.g. sub slogans) ----
+function makeStringRepeater(containerId, addBtnId, placeholder, initialValues) {
+  const container = document.getElementById(containerId);
+  let values = [...(initialValues || [])];
 
-const urlParams = new URLSearchParams(location.search);
-const editSlug = urlParams.get('edit');
-let repeaters = {};
-let logoField = null;
-let existingCreatedAt = null; // preserved from the original file when editing
-
-function toSlug(str) {
-  return str.trim().toLowerCase()
-    .replace(/[^a-z0-9가-힣\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
-
-function renderGhBanner() {
-  const cfg = getGithubConfig();
-  const el = document.getElementById('gh-banner');
-  if (cfg) {
-    el.innerHTML = `<div class="gh-banner ok"><span>✅ GitHub 연결됨: <b>${cfg.owner}/${cfg.repo}</b> (${cfg.branch})</span><a class="btn btn-sm" href="settings.html">연결 변경</a></div>`;
-  } else {
-    el.innerHTML = `<div class="gh-banner warn"><span>⚠️ 아직 GitHub 연결이 안 되어 있습니다. 등록하려면 먼저 연결하세요.</span><a class="btn btn-primary btn-sm" href="settings.html">연결 설정하기</a></div>`;
+  function renderRows() {
+    container.innerHTML = '';
+    values.forEach((val, idx) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'repeater-row';
+      const fieldsWrap = document.createElement('div');
+      fieldsWrap.className = 'row-fields';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = placeholder || '';
+      input.value = val;
+      input.addEventListener('input', () => { values[idx] = input.value; });
+      fieldsWrap.appendChild(input);
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-row-btn';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', () => { values.splice(idx, 1); renderRows(); });
+      rowEl.append(fieldsWrap, removeBtn);
+      container.appendChild(rowEl);
+    });
+    if (!values.length) {
+      container.innerHTML = '<p class="hint">아직 추가된 항목이 없습니다.</p>';
+    }
   }
-}
 
-async function loadExisting() {
-  if (!editSlug) return null;
-  try {
-    const res = await fetch(`data/brands/${encodeURIComponent(editSlug)}.json`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('not found');
-    return await res.json();
-  } catch (e) {
-    alert('기존 브랜드 데이터를 불러오지 못했습니다.');
-    return null;
-  }
-}
-
-function fillBasicFields(existing) {
-  existingCreatedAt = existing.createdAt || new Date().toISOString().slice(0, 10);
-  document.getElementById('page-heading').textContent = '브랜드 수정';
-  document.getElementById('doc-title').textContent = '브랜드 수정 - 브랜드 허브';
-  document.getElementById('submit-btn').textContent = '브랜드 수정하기';
-  document.getElementById('f-name').value = existing.name || '';
-  const slugField = document.getElementById('f-slug');
-  slugField.value = existing.slug || '';
-  slugField.disabled = true;
-  slugField.dataset.touched = '1';
-  document.getElementById('f-color').value = existing.color || '#8B3A2F';
-  document.getElementById('f-tagline').value = existing.tagline || '';
-  document.getElementById('f-oneliner').value = existing.overview?.oneLiner || '';
-  document.getElementById('f-story').value = existing.overview?.story || '';
-  document.getElementById('f-concept').value = existing.overview?.concept || '';
-  document.getElementById('f-target').value = existing.overview?.targetCustomer || '';
-  document.getElementById('f-diff').value = existing.overview?.differentiation || '';
-  document.getElementById('f-main-slogan').value = existing.copywriting?.mainSlogan || '';
-}
-
-async function init() {
-  initTabs('form-tabs');
-  renderGhBanner();
-  const existing = await loadExisting();
-  if (existing) fillBasicFields(existing);
-
-  logoField = createImageField('logo-field', existing?.logo || '');
-
-  repeaters.presentations = makeRepeater('presentations-list', 'add-presentation', PRESENTATION_FIELDS, existing?.presentations || []);
-  repeaters.brandImages = makeRepeater('brandimages-list', 'add-brandimage', BRANDIMAGE_FIELDS, existing?.brandImages || []);
-  repeaters.colors = makeRepeater('colors-list', 'add-color', COLOR_FIELDS,
-    existing?.brandColors?.length ? existing.brandColors : [{ name: '', hex: '#8B3A2F', usage: '' }]);
-  repeaters.subslogans = makeRepeater('subslogans-list', 'add-subslogan', SUB_FIELDS,
-    (existing?.copywriting?.subSlogans || []).map(t => ({ text: t })));
-  repeaters.lunch = makeRepeater('lunch-list', 'add-lunch', MENU_FIELDS, existing?.menu?.lunch || []);
-  repeaters.dinner = makeRepeater('dinner-list', 'add-dinner', MENU_FIELDS, existing?.menu?.dinner || []);
-  repeaters.season = makeRepeater('season-list', 'add-season', SEASON_FIELDS, existing?.seasonMenu || []);
-  repeaters.events = makeRepeater('events-list', 'add-event', EVENT_FIELDS, existing?.events || []);
-
-  document.getElementById('f-name').addEventListener('input', e => {
-    const slugField = document.getElementById('f-slug');
-    if (!slugField.dataset.touched) slugField.value = toSlug(e.target.value);
+  document.getElementById(addBtnId).addEventListener('click', () => {
+    values.push('');
+    renderRows();
   });
-  document.getElementById('f-slug').addEventListener('input', e => { e.target.dataset.touched = '1'; });
 
-  document.getElementById('submit-btn').addEventListener('click', () => submitBrand(!!existing));
-  document.getElementById('btn-preview').addEventListener('click', showPreview);
-  document.getElementById('btn-download').addEventListener('click', downloadJson);
-}
-
-function numifyMenuRow(r) { return { ...r, price: Number(r.price) || 0, cost: Number(r.cost) || 0 }; }
-
-function buildBrandData() {
-  const name = document.getElementById('f-name').value.trim();
-  const slug = document.getElementById('f-slug').value.trim() || toSlug(name);
-  const color = document.getElementById('f-color').value;
-  const tagline = document.getElementById('f-tagline').value.trim();
+  renderRows();
 
   return {
+    getRows: () => values.filter(v => v && v.trim()),
+    setRows: (newValues) => { values = [...(newValues || [])]; renderRows(); },
+  };
+}
+
+// ---- logo mini field (single, not a repeater) ----
+function setupLogoField(initialPath) {
+  const wrap = document.getElementById('logo-field-wrap');
+  const row = { logo: initialPath || '' };
+  logoPath = row.logo;
+  const el = renderImageMiniField(row, { key: 'logo', label: '' });
+  wrap.appendChild(el);
+  const origInput = el.querySelector('input[type=file]');
+  origInput.addEventListener('change', () => {
+    setTimeout(() => { logoPath = row.logo; }, 0);
+  });
+  // poll row.logo -> logoPath after upload completes (upload is async inside renderImageMiniField)
+  const observer = setInterval(() => { logoPath = row.logo; }, 500);
+  window.addEventListener('beforeunload', () => clearInterval(observer));
+}
+
+// ---- init repeaters ----
+function initRepeaters(brand) {
+  brand = brand || {};
+  repeaters.brandImages = makeRepeater('brandImages-list', 'add-brandImage',
+    [{ key: 'image', label: '이미지', type: 'image' }, { key: 'caption', label: '설명' }],
+    brand.brandImages);
+
+  repeaters.presentations = makeRepeater('presentations-list', 'add-presentation',
+    [{ key: 'title', label: '자료명', placeholder: '예: 쟁반집 사업계획서' },
+     { key: 'path', label: 'PPT 파일', type: 'file', accept: '.ppt,.pptx' }],
+    brand.presentations);
+
+  repeaters.brandColors = makeRepeater('brandColors-list', 'add-brandColor',
+    [{ key: 'name', label: '색상명', placeholder: '예: 메인 브라운' },
+     { key: 'hex', label: 'HEX 코드', type: 'color' },
+     { key: 'usage', label: '활용처', placeholder: '예: 로고, 간판' }],
+    (brand.brandColors));
+
+  repeaters.subSlogans = makeStringRepeater('subSlogans-list', 'add-subSlogan',
+    '예: 매일 아침 손질하는 제철 안주', (brand.copywriting || {}).subSlogans);
+
+  const menuFields = [
+    { key: 'name', label: '메뉴명' },
+    { key: 'price', label: '판매가', type: 'number', placeholder: '숫자만 입력 (원)' },
+    { key: 'cost', label: '원가', type: 'number', placeholder: '숫자만 입력 (원)' },
+    { key: 'desc', label: '설명', type: 'textarea' },
+    { key: 'image', label: '사진', type: 'image' },
+  ];
+  repeaters.lunch = makeRepeater('lunch-list', 'add-lunch', menuFields, (brand.menu || {}).lunch);
+  repeaters.dinner = makeRepeater('dinner-list', 'add-dinner', menuFields, (brand.menu || {}).dinner);
+
+  repeaters.season = makeRepeater('season-list', 'add-season',
+    [{ key: 'season', label: '시즌', placeholder: '예: 여름' },
+     { key: 'name', label: '메뉴명' },
+     { key: 'period', label: '기간', placeholder: '예: 6월~8월' },
+     { key: 'desc', label: '설명', type: 'textarea' },
+     { key: 'image', label: '사진', type: 'image' }],
+    brand.seasonMenu);
+
+  repeaters.events = makeRepeater('events-list', 'add-event',
+    [{ key: 'title', label: '이벤트명' },
+     { key: 'period', label: '기간' },
+     { key: 'desc', label: '설명', type: 'textarea' }],
+    brand.events);
+}
+
+// ---- fill basic fields ----
+function fillBasicFields(brand) {
+  document.getElementById('f-name').value = brand.name || '';
+  document.getElementById('f-slug').value = brand.slug || '';
+  document.getElementById('f-tagline').value = brand.tagline || '';
+  document.getElementById('f-color').value = brand.color || '#8B3A2F';
+  document.getElementById('f-oneliner').value = (brand.overview || {}).oneLiner || '';
+  document.getElementById('f-story').value = (brand.overview || {}).story || '';
+  document.getElementById('f-concept').value = (brand.overview || {}).concept || '';
+  document.getElementById('f-target').value = (brand.overview || {}).targetCustomer || '';
+  document.getElementById('f-diff').value = (brand.overview || {}).differentiation || '';
+  document.getElementById('f-mainslogan').value = (brand.copywriting || {}).mainSlogan || '';
+}
+
+// ---- build brand data object from form ----
+function buildBrandData() {
+  const slug = currentSlug();
+  return {
     slug,
-    name,
-    tagline,
-    color,
-    createdAt: editSlug ? existingCreatedAt : new Date().toISOString().slice(0, 10),
-    logo: logoField ? logoField.getValue() : '',
+    name: document.getElementById('f-name').value.trim(),
+    tagline: document.getElementById('f-tagline').value.trim(),
+    color: document.getElementById('f-color').value,
+    createdAt: window.__existingBrand?.createdAt || new Date().toISOString(),
+    logo: logoPath || '',
     brandImages: repeaters.brandImages ? repeaters.brandImages.getRows() : [],
     presentations: repeaters.presentations ? repeaters.presentations.getRows() : [],
     overview: {
@@ -376,101 +313,121 @@ function buildBrandData() {
       targetCustomer: document.getElementById('f-target').value.trim(),
       differentiation: document.getElementById('f-diff').value.trim(),
     },
-    brandColors: repeaters.colors.getRows(),
+    brandColors: repeaters.brandColors ? repeaters.brandColors.getRows() : [],
     copywriting: {
-      mainSlogan: document.getElementById('f-main-slogan').value.trim(),
-      subSlogans: repeaters.subslogans.getRows().map(r => r.text).filter(Boolean),
+      mainSlogan: document.getElementById('f-mainslogan').value.trim(),
+      subSlogans: repeaters.subSlogans ? repeaters.subSlogans.getRows() : [],
     },
     menu: {
-      lunch: repeaters.lunch.getRows().map(numifyMenuRow),
-      dinner: repeaters.dinner.getRows().map(numifyMenuRow),
+      lunch: repeaters.lunch ? repeaters.lunch.getRows() : [],
+      dinner: repeaters.dinner ? repeaters.dinner.getRows() : [],
     },
-    seasonMenu: repeaters.season.getRows(),
-    events: repeaters.events.getRows(),
+    seasonMenu: repeaters.season ? repeaters.season.getRows() : [],
+    events: repeaters.events ? repeaters.events.getRows() : [],
   };
 }
 
-function currentJson() {
-  const data = buildBrandData();
-  return { data, text: JSON.stringify(data, null, 2) };
-}
-
-function showPreview() {
-  const { text } = currentJson();
-  const pre = document.getElementById('json-preview');
-  pre.textContent = text;
-  pre.style.display = 'block';
-}
-
-function downloadJson() {
-  const { data, text } = currentJson();
-  if (!data.slug) { alert('브랜드명 또는 슬러그를 입력해주세요.'); return; }
-  const blob = new Blob([text], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${data.slug}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function setSubmitStatus(msg, state) {
-  const el = document.getElementById('submit-status');
-  el.textContent = msg;
-  el.className = 'submit-status' + (state ? ' ' + state : '');
-}
-
-async function submitBrand(isEdit) {
+// ---- submit ----
+async function submitBrand() {
+  const statusEl = document.getElementById('submit-status');
   const cfg = getGithubConfig();
-  if (!cfg) { setSubmitStatus('먼저 GitHub 연결 설정을 해주세요.', 'err'); return; }
+  if (!cfg) {
+    statusEl.textContent = '먼저 설정 페이지에서 GitHub 연결 정보를 저장해주세요.';
+    return;
+  }
+  const brand = buildBrandData();
+  if (!brand.name) { statusEl.textContent = '브랜드명을 입력해주세요.'; return; }
+  const slug = slugify(brand.slug || brand.name);
+  if (!slug) { statusEl.textContent = '슬러그(영문 URL)를 입력해주세요.'; return; }
+  brand.slug = slug;
 
-  const data = buildBrandData();
-  if (!data.name || !data.slug) { setSubmitStatus('브랜드명을 입력해주세요.', 'err'); return; }
-
+  const isEdit = !!originalSlug;
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
-  setSubmitStatus(isEdit ? '수정 내용을 GitHub에 저장하는 중...' : 'GitHub에 새 브랜드를 등록하는 중...');
+  statusEl.textContent = 'GitHub에 저장하는 중...';
 
   try {
-    const filePath = `data/brands/${data.slug}.json`;
+    const brandPath = `data/brands/${slug}.json`;
 
     if (!isEdit) {
-      const already = await ghGetFileRaw(cfg, filePath);
-      if (already) throw new Error('이미 같은 슬러그의 브랜드가 있습니다. 슬러그를 다르게 입력해주세요.');
+      const existing = await ghGetFileRaw(cfg, brandPath);
+      if (existing) throw new Error('이미 같은 슬러그의 브랜드가 존재합니다. 다른 슬러그를 입력해주세요.');
+    } else if (slug !== originalSlug) {
+      throw new Error('슬러그는 등록 후 변경할 수 없습니다.');
     }
 
-    // ghPutTextSmart always fetches a fresh sha right before writing (and retries
-    // once if GitHub still rejects it as stale), so this is safe even right after
-    // an image/PPT upload touched other files in the repo.
-    await ghPutTextSmart(cfg, filePath, JSON.stringify(data, null, 2), isEdit ? `브랜드 수정: ${data.name}` : `새 브랜드 추가: ${data.name}`);
+    await ghPutTextSmart(cfg, brandPath, JSON.stringify(brand, null, 2), `${isEdit ? '브랜드 수정' : '브랜드 등록'}: ${brand.name}`);
 
     // update index.json
     const idxPath = 'data/brands/index.json';
-    const idxFile = await ghGetFile(cfg, idxPath);
-    let idxArr = [];
-    try { idxArr = idxFile ? JSON.parse(idxFile.text) : []; } catch (e) { idxArr = []; }
-    const entry = {
-      slug: data.slug,
-      name: data.name,
-      tagline: data.tagline,
-      color: data.color,
-      summary: data.overview.oneLiner || data.overview.concept || '',
-    };
-    const pos = idxArr.findIndex(b => b.slug === data.slug);
-    if (pos >= 0) idxArr[pos] = entry; else idxArr.push(entry);
-    await ghPutTextSmart(cfg, idxPath, JSON.stringify(idxArr, null, 2), `브랜드 목록 업데이트: ${data.name}`);
+    let indexArr = [];
+    const idxExisting = await ghGetFile(cfg, idxPath);
+    if (idxExisting) {
+      try { indexArr = JSON.parse(idxExisting.text); } catch (e) { indexArr = []; }
+    }
+    const summary = { slug: brand.slug, name: brand.name, tagline: brand.tagline, color: brand.color };
+    const pos = indexArr.findIndex(b => b.slug === slug);
+    if (pos >= 0) indexArr[pos] = summary; else indexArr.push(summary);
+    await ghPutTextSmart(cfg, idxPath, JSON.stringify(indexArr, null, 2), `브랜드 목록 갱신: ${brand.name}`);
 
-    // instant local cache so the next page shows the fresh data right away,
-    // without waiting for GitHub Pages to rebuild.
-    sessionStorage.setItem(`brand-cache-${data.slug}`, JSON.stringify(data));
-    sessionStorage.setItem('index-cache', JSON.stringify(idxArr));
+    // instant-view cache so the next page shows fresh data without waiting for Pages rebuild
+    sessionStorage.setItem(`brand-cache-${slug}`, JSON.stringify(brand));
+    sessionStorage.setItem('index-cache', JSON.stringify(indexArr));
 
-    setSubmitStatus('저장 완료! 이동합니다...', 'ok');
-    location.href = `brand.html?brand=${encodeURIComponent(data.slug)}`;
+    statusEl.textContent = '저장 완료! 이동합니다...';
+    location.href = `brand.html?brand=${encodeURIComponent(slug)}`;
   } catch (e) {
-    console.error(e);
-    setSubmitStatus('저장 실패: ' + e.message, 'err');
+    statusEl.textContent = '❌ ' + e.message;
     btn.disabled = false;
+    console.error(e);
   }
+}
+
+document.getElementById('submit-btn').addEventListener('click', submitBrand);
+
+document.getElementById('btn-preview').addEventListener('click', () => {
+  document.getElementById('json-preview').value = JSON.stringify(buildBrandData(), null, 2);
+});
+document.getElementById('btn-download').addEventListener('click', () => {
+  const brand = buildBrandData();
+  const blob = new Blob([JSON.stringify(brand, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${brand.slug || 'brand'}.json`;
+  a.click();
+});
+
+// auto-suggest slug from name while creating a new brand
+document.getElementById('f-name').addEventListener('input', () => {
+  if (originalSlug) return; // don't touch slug once editing an existing brand
+  const slugEl = document.getElementById('f-slug');
+  if (!slugEl.dataset.touched) {
+    slugEl.value = slugify(document.getElementById('f-name').value);
+  }
+});
+document.getElementById('f-slug').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+
+// ---- init ----
+async function init() {
+  if (editSlug) {
+    document.getElementById('page-title').textContent = '브랜드 수정';
+    document.getElementById('f-slug').disabled = true;
+    try {
+      const res = await fetch(`data/brands/${encodeURIComponent(editSlug)}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('brand not found');
+      const brand = await res.json();
+      window.__existingBrand = brand;
+      fillBasicFields(brand);
+      setupLogoField(brand.logo);
+      initRepeaters(brand);
+      return;
+    } catch (e) {
+      document.getElementById('submit-status').textContent = '기존 브랜드 데이터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.';
+      console.error(e);
+    }
+  }
+  setupLogoField('');
+  initRepeaters({});
 }
 
 init();

@@ -1,52 +1,48 @@
-async function loadBrands() {
-  const grid = document.getElementById('brand-grid');
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, s => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[s]));
+}
 
-  // instant-view cache: right after registering a brand we stash the fresh
-  // index list here so it shows up immediately without waiting for GitHub
-  // Pages to rebuild.
+async function loadBrands() {
+  const listEl = document.getElementById('brand-list');
+
+  // instant-view cache from a just-completed add/edit, so the new/updated
+  // card shows immediately without waiting for GitHub Pages to rebuild.
   const cached = sessionStorage.getItem('index-cache');
   if (cached) {
-    sessionStorage.removeItem('index-cache');
     try {
-      renderBrands(JSON.parse(cached));
+      const brands = JSON.parse(cached);
+      sessionStorage.removeItem('index-cache');
+      renderList(brands);
       return;
     } catch (e) { /* fall through to fetch */ }
   }
 
   try {
     const res = await fetch('data/brands/index.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('index.json not found');
+    if (!res.ok) throw new Error('index not found');
     const brands = await res.json();
-    renderBrands(brands);
+    renderList(brands);
   } catch (e) {
-    grid.innerHTML = '<p class="empty-msg">브랜드 목록을 불러오지 못했습니다. data/brands/index.json 파일을 확인하세요.</p>';
+    listEl.innerHTML = '<p class="empty-msg">아직 등록된 브랜드가 없습니다. "브랜드 추가" 버튼으로 첫 브랜드를 등록해보세요.</p>';
     console.error(e);
   }
 }
 
-function renderBrands(brands) {
-  const grid = document.getElementById('brand-grid');
-  if (!brands.length) {
-    grid.innerHTML = '<p class="empty-msg">등록된 브랜드가 없습니다. 상단의 "새 브랜드 추가"로 시작하세요.</p>';
+function renderList(brands) {
+  const listEl = document.getElementById('brand-list');
+  if (!brands || !brands.length) {
+    listEl.innerHTML = '<p class="empty-msg">아직 등록된 브랜드가 없습니다. "브랜드 추가" 버튼으로 첫 브랜드를 등록해보세요.</p>';
     return;
   }
-  grid.innerHTML = brands.map(b => `
-    <a class="brand-card" href="brand.html?brand=${encodeURIComponent(b.slug)}" style="--brand-color:${escapeAttr(b.color || '#8B3A2F')}">
-      <div class="brand-card-color"></div>
-      <div class="brand-card-body">
-        <h2>${escapeHtml(b.name)}</h2>
-        <p class="tagline">${escapeHtml(b.tagline || '')}</p>
-        <p class="summary">${escapeHtml(b.summary || '')}</p>
-      </div>
+  listEl.innerHTML = brands.map(b => `
+    <a class="brand-card" href="brand.html?brand=${encodeURIComponent(b.slug)}">
+      <div class="swatch-bar" style="background:${escapeHtml(b.color || '#8B3A2F')}"></div>
+      <h3>${escapeHtml(b.name)}</h3>
+      <p>${escapeHtml(b.tagline || '')}</p>
     </a>
   `).join('');
 }
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, s => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[s]));
-}
-function escapeAttr(str) { return escapeHtml(str); }
 
 loadBrands();

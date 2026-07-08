@@ -1,153 +1,141 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="doc-title">새 브랜드 추가 - 브랜드 허브</title>
+<title>브랜드 추가/수정 - 브랜드 허브</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-inner">
-    <a href="index.html" class="logo">← 브랜드 허브</a>
-    <a href="settings.html" class="btn btn-sm">⚙ GitHub 연결</a>
-  </div>
-</header>
+  <header class="site-header">
+    <a class="logo" href="index.html">🗂️ 브랜드 허브</a>
+    <nav>
+      <a class="btn" href="settings.html">⚙️ 설정</a>
+      <a class="btn btn-primary" href="add-brand.html">+ 브랜드 추가</a>
+    </nav>
+  </header>
 
-<main class="container">
-  <h1 id="page-heading">새 브랜드 추가</h1>
-  <div id="gh-banner"></div>
+  <main class="container">
+    <div class="page-title-row"><h1 id="page-title">브랜드 추가</h1></div>
 
-  <div class="tabs" id="form-tabs">
-    <button class="tab-btn active" data-tab="basic">기본정보</button>
-    <button class="tab-btn" data-tab="logo">로고·이미지</button>
-    <button class="tab-btn" data-tab="presentations">발표자료</button>
-    <button class="tab-btn" data-tab="overview">개요</button>
-    <button class="tab-btn" data-tab="colors">브랜드컬러</button>
-    <button class="tab-btn" data-tab="copy">카피문구</button>
-    <button class="tab-btn" data-tab="lunch">점심메뉴</button>
-    <button class="tab-btn" data-tab="dinner">저녁메뉴</button>
-    <button class="tab-btn" data-tab="season">시즌메뉴</button>
-    <button class="tab-btn" data-tab="events">이벤트</button>
-  </div>
-
-  <section class="tab-panel active" data-panel="basic">
-    <div class="form-section">
-      <h2>기본 정보</h2>
-      <div class="form-grid">
-        <div class="field"><label>브랜드명</label><input id="f-name" placeholder="예: 쟁반집"></div>
-        <div class="field"><label>슬러그(영문 파일명)</label><input id="f-slug" placeholder="예: jaengban-jip"></div>
-        <div class="field"><label>대표 컬러</label><input id="f-color" type="color" value="#8B3A2F"></div>
-        <div class="field"><label>한 줄 태그라인</label><input id="f-tagline" placeholder="예: 오늘, 맛있는 한 쟁반."></div>
+    <div class="form-card">
+      <div class="tabs-form-nav" id="form-tabs">
+        <button class="active" data-tab="basic">기본정보</button>
+        <button data-tab="logoimages">로고·이미지</button>
+        <button data-tab="presentations">발표자료</button>
+        <button data-tab="overview">개요</button>
+        <button data-tab="colors">브랜드컬러</button>
+        <button data-tab="copy">카피문구</button>
+        <button data-tab="lunch">점심메뉴</button>
+        <button data-tab="dinner">저녁메뉴</button>
+        <button data-tab="season">시즌메뉴</button>
+        <button data-tab="events">이벤트</button>
       </div>
-      <p class="hint">슬러그는 URL, 파일명, 이미지/파일 저장 폴더명에 쓰입니다. 브랜드명을 입력하면 자동으로 채워집니다. (수정 화면에서는 슬러그를 바꿀 수 없습니다.) 이미지나 PPT를 업로드하려면 슬러그를 먼저 정해주세요.</p>
-    </div>
-  </section>
 
-  <section class="tab-panel" data-panel="logo">
-    <div class="form-section">
-      <h2>로고</h2>
-      <div id="logo-field"></div>
-    </div>
-    <div class="form-section">
-      <h2>브랜드 이미지</h2>
-      <p class="hint">매장 사진, 컨셉 이미지 등 메뉴가 아닌 브랜드 관련 이미지를 넣는 곳입니다.</p>
-      <div id="brandimages-list"></div>
-      <button class="btn add-row-btn" id="add-brandimage">+ 브랜드 이미지 추가</button>
-    </div>
-  </section>
+      <div id="form-panels">
+        <section class="form-panel active" data-panel="basic">
+          <div class="field-row">
+            <label>브랜드명</label>
+            <input type="text" id="f-name" placeholder="예: 쟁반집">
+          </div>
+          <div class="field-row">
+            <label>슬러그 (영문 URL, 등록 후 변경 불가)</label>
+            <input type="text" id="f-slug" placeholder="예: jaengban-jip">
+            <p class="hint">브랜드별 이미지/파일이 저장되는 경로에 사용돼요. 영문 소문자, 숫자, 하이픈만 사용하세요.</p>
+          </div>
+          <div class="field-row">
+            <label>한 줄 태그라인</label>
+            <input type="text" id="f-tagline" placeholder="예: 정성 가득한 술상 한 상">
+          </div>
+          <div class="field-row">
+            <label>브랜드 대표 색상</label>
+            <input type="color" id="f-color" value="#8B3A2F">
+          </div>
+        </section>
 
-  <section class="tab-panel" data-panel="presentations">
-    <div class="form-section">
-      <h2>발표자료 (PPT)</h2>
-      <p class="hint">사업계획서, 브랜딩 PPT 등을 올려두면 브랜드 상세 페이지에서 누구나 다운로드할 수 있는 링크가 생깁니다. .ppt / .pptx 파일만 업로드할 수 있고, 25MB 이하여야 합니다.</p>
-      <div id="presentations-list"></div>
-      <button class="btn add-row-btn" id="add-presentation">+ 발표자료 추가</button>
-    </div>
-  </section>
+        <section class="form-panel" data-panel="logoimages">
+          <div class="field-row">
+            <label>로고</label>
+            <div id="logo-field-wrap"></div>
+          </div>
+          <div class="field-row">
+            <label>브랜드 이미지</label>
+            <div id="brandImages-list"></div>
+            <button type="button" class="btn add-row-btn" id="add-brandImage">+ 브랜드 이미지 추가</button>
+          </div>
+        </section>
 
-  <section class="tab-panel" data-panel="overview">
-    <div class="form-section">
-      <h2>개요</h2>
-      <div class="form-grid">
-        <div class="field"><label>한 줄 소개</label><input id="f-oneliner"></div>
-        <div class="field" style="grid-column:1/-1;"><label>브랜드 스토리</label><textarea id="f-story" rows="4"></textarea></div>
-        <div class="field"><label>컨셉</label><input id="f-concept"></div>
-        <div class="field"><label>타깃 고객</label><input id="f-target"></div>
-        <div class="field" style="grid-column:1/-1;"><label>차별화 포인트</label><textarea id="f-diff" rows="3"></textarea></div>
+        <section class="form-panel" data-panel="presentations">
+          <div class="field-row">
+            <label>발표자료 (PPT)</label>
+            <div id="presentations-list"></div>
+            <button type="button" class="btn add-row-btn" id="add-presentation">+ 발표자료 추가</button>
+          </div>
+        </section>
+
+        <section class="form-panel" data-panel="overview">
+          <div class="field-row"><label>한 줄 소개</label><textarea id="f-oneliner"></textarea></div>
+          <div class="field-row"><label>브랜드 스토리</label><textarea id="f-story"></textarea></div>
+          <div class="field-row"><label>컨셉</label><textarea id="f-concept"></textarea></div>
+          <div class="field-row"><label>타깃 고객</label><textarea id="f-target"></textarea></div>
+          <div class="field-row"><label>차별화 포인트</label><textarea id="f-diff"></textarea></div>
+        </section>
+
+        <section class="form-panel" data-panel="colors">
+          <div id="brandColors-list"></div>
+          <button type="button" class="btn add-row-btn" id="add-brandColor">+ 브랜드컬러 추가</button>
+        </section>
+
+        <section class="form-panel" data-panel="copy">
+          <div class="field-row">
+            <label>메인 슬로건</label>
+            <input type="text" id="f-mainslogan">
+          </div>
+          <div class="field-row">
+            <label>서브 슬로건</label>
+            <div id="subSlogans-list"></div>
+            <button type="button" class="btn add-row-btn" id="add-subSlogan">+ 서브 슬로건 추가</button>
+          </div>
+        </section>
+
+        <section class="form-panel" data-panel="lunch">
+          <div id="lunch-list"></div>
+          <button type="button" class="btn add-row-btn" id="add-lunch">+ 점심메뉴 추가</button>
+        </section>
+
+        <section class="form-panel" data-panel="dinner">
+          <div id="dinner-list"></div>
+          <button type="button" class="btn add-row-btn" id="add-dinner">+ 저녁메뉴 추가</button>
+        </section>
+
+        <section class="form-panel" data-panel="season">
+          <div id="season-list"></div>
+          <button type="button" class="btn add-row-btn" id="add-season">+ 시즌메뉴 추가</button>
+        </section>
+
+        <section class="form-panel" data-panel="events">
+          <div id="events-list"></div>
+          <button type="button" class="btn add-row-btn" id="add-event">+ 이벤트 추가</button>
+        </section>
       </div>
-    </div>
-  </section>
 
-  <section class="tab-panel" data-panel="colors">
-    <div class="form-section">
-      <h2>브랜드컬러</h2>
-      <div id="colors-list"></div>
-      <button class="btn add-row-btn" id="add-color">+ 컬러 추가</button>
-    </div>
-  </section>
+      <div class="save-bar">
+        <button class="btn btn-primary" id="submit-btn">저장하기</button>
+        <span id="submit-status" class="hint"></span>
+      </div>
 
-  <section class="tab-panel" data-panel="copy">
-    <div class="form-section">
-      <h2>카피문구</h2>
-      <div class="field"><label>메인 슬로건</label><input id="f-main-slogan" placeholder="예: 오늘, 맛있는 한 쟁반."></div>
-      <div id="subslogans-list" style="margin-top:12px;"></div>
-      <button class="btn add-row-btn" id="add-subslogan">+ 보조 카피 추가</button>
-    </div>
-  </section>
-
-  <section class="tab-panel" data-panel="lunch">
-    <div class="form-section">
-      <h2>메뉴라인업 - 점심</h2>
-      <div id="lunch-list"></div>
-      <button class="btn add-row-btn" id="add-lunch">+ 점심 메뉴 추가</button>
-    </div>
-  </section>
-
-  <section class="tab-panel" data-panel="dinner">
-    <div class="form-section">
-      <h2>메뉴라인업 - 저녁 · 술상</h2>
-      <div id="dinner-list"></div>
-      <button class="btn add-row-btn" id="add-dinner">+ 저녁 메뉴 추가</button>
-    </div>
-  </section>
-
-  <section class="tab-panel" data-panel="season">
-    <div class="form-section">
-      <h2>시즌메뉴</h2>
-      <div id="season-list"></div>
-      <button class="btn add-row-btn" id="add-season">+ 시즌메뉴 추가</button>
-    </div>
-  </section>
-
-  <section class="tab-panel" data-panel="events">
-    <div class="form-section">
-      <h2>이벤트</h2>
-      <div id="events-list"></div>
-      <button class="btn add-row-btn" id="add-event">+ 이벤트 추가</button>
-    </div>
-  </section>
-
-  <div class="form-section">
-    <h2>저장하기</h2>
-    <p class="hint">버튼을 누르면 지금 보이는 탭뿐 아니라 모든 탭의 내용이 함께 GitHub 저장소에 커밋됩니다. 몇 초~1분 정도 후 실제 사이트에도 반영돼요 (저장 직후에는 미리보기로 바로 확인할 수 있어요).</p>
-    <button class="btn btn-primary" id="submit-btn" style="font-size:1rem;padding:12px 24px;">브랜드 등록하기</button>
-    <p id="submit-status" class="submit-status"></p>
-
-    <details class="advanced">
-      <summary>고급: JSON 파일로 직접 내보내기 (GitHub 자동 저장이 안 될 때 백업용)</summary>
-      <div class="adv-body">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn" id="btn-preview">JSON 미리보기</button>
-          <button class="btn" id="btn-download">JSON 다운로드</button>
+      <details class="advanced">
+        <summary>고급: JSON 직접 보기/다운로드 (GitHub 연결 없이 수동 백업용)</summary>
+        <div class="save-bar">
+          <button class="btn btn-sm" id="btn-preview">JSON 미리보기</button>
+          <button class="btn btn-sm" id="btn-download">JSON 다운로드</button>
         </div>
-        <pre id="json-preview" style="display:none;margin-top:14px;"></pre>
-      </div>
-    </details>
-  </div>
-</main>
+        <textarea id="json-preview" readonly></textarea>
+      </details>
+    </div>
+  </main>
 
-<script src="assets/js/github-api.js"></script>
-<script src="assets/js/add-brand.js"></script>
+  <script src="assets/js/github-api.js"></script>
+  <script src="assets/js/add-brand.js"></script>
 </body>
 </html>

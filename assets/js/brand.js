@@ -52,6 +52,37 @@ window.__imgRetry = function (imgEl, originalSrc, attempt) {
   }, attempt * 3000);
 };
 
+// Same idea for PPT download links: a file that was just uploaded to GitHub
+// isn't reachable on the published site until Pages rebuilds. Clicking a
+// download link too early makes the browser show a "file can't be used"
+// error, so we verify the file is actually there first (with retries) and
+// only turn the button into a real, clickable download link once confirmed.
+function verifyPresentationLink(anchorEl, attempt) {
+  attempt = attempt || 1;
+  const path = anchorEl.dataset.path;
+  fetch(path, { method: 'HEAD', cache: 'no-store' })
+    .then(res => {
+      if (!res.ok) throw new Error('not ready');
+      anchorEl.textContent = '다운로드';
+      anchorEl.classList.remove('file-pending');
+    })
+    .catch(() => {
+      if (attempt > 6) {
+        anchorEl.textContent = '잠시 후 새로고침';
+        anchorEl.classList.remove('file-pending');
+        anchorEl.removeAttribute('download');
+        anchorEl.href = '#';
+        anchorEl.addEventListener('click', e => {
+          e.preventDefault();
+          alert('파일이 아직 GitHub Pages에 반영되지 않았어요. 1~2분 후 새로고침한 다음 다시 시도해보세요.');
+        });
+        return;
+      }
+      anchorEl.textContent = `배포 확인 중 (${attempt}/6)`;
+      setTimeout(() => verifyPresentationLink(anchorEl, attempt + 1), attempt * 3000);
+    });
+}
+
 async function init() {
   if (!slug) {
     main.innerHTML = '<p class="empty-msg">브랜드가 지정되지 않았습니다. <a href="index.html">목록으로 돌아가기</a></p>';
@@ -135,6 +166,8 @@ function render(brand) {
     });
   });
 
+  document.querySelectorAll('.file-pending').forEach(a => verifyPresentationLink(a));
+
   setupCostCalculator(brand);
 }
 
@@ -201,14 +234,33 @@ function renderPresentations(b) {
     <div class="section-block">
       <h3>발표자료</h3>
       <ul class="file-list">
-        ${list.map(p => `
-          <li class="file-list-item">
-            <span class="file-list-name">📊 ${escapeHtml(p.title || fileNameFromPath(p.path))}</span>
-            ${p.path
-              ? `<a class="btn btn-sm btn-primary" href="${escapeHtml(p.path)}" download>다운로드</a>`
-              : '<span class="hint">파일 없음</span>'}
-          </li>
-        `).join('')}
+        ${list.map(p => {
+          const path = p.path || '';
+          const name = p.title || fileNameFromPath(path);
+          if (!path) {
+            return `
+              <li class="file-list-item">
+                <span class="file-list-name">📊 ${escapeHtml(name)}</span>
+                <span class="hint">파일 없음</span>
+              </li>
+            `;
+          }
+          const isExternal = /^https?:\/\//i.test(path);
+          if (isExternal) {
+            return `
+              <li class="file-list-item">
+                <span class="file-list-name">📊 ${escapeHtml(name)}</span>
+                <a class="btn btn-sm btn-primary" href="${escapeHtml(path)}" target="_blank" rel="noopener">다운로드</a>
+              </li>
+            `;
+          }
+          return `
+            <li class="file-list-item">
+              <span class="file-list-name">📊 ${escapeHtml(name)}</span>
+              <a class="btn btn-sm btn-primary file-pending" href="${escapeHtml(path)}" download data-path="${escapeHtml(path)}">확인 중...</a>
+            </li>
+          `;
+        }).join('')}
       </ul>
     </div>
   `;

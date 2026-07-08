@@ -125,12 +125,14 @@ function fileToBase64(file) {
   });
 }
 
+// Keeps Korean (and other Unicode letters/numbers) instead of collapsing them to
+// nothing, which previously made every non-Latin filename end up as just "file".
 function sanitizeFileName(name) {
   const dot = name.lastIndexOf('.');
-  const base = (dot > 0 ? name.slice(0, dot) : name)
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^\w-]+/g, '-')
+  const rawBase = dot > 0 ? name.slice(0, dot) : name;
+  const base = rawBase
+    .trim()
+    .replace(/[^\p{L}\p{N}_-]+/gu, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
   const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';

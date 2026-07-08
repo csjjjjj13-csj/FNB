@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -7,27 +7,23 @@
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-inner">
-    <h1 class="logo">🗂 브랜드 허브</h1>
-    <div style="display:flex;gap:8px;">
-      <a href="settings.html" class="btn btn-sm">⚙ GitHub 연결</a>
-      <a href="add-brand.html" class="btn btn-primary">+ 새 브랜드 추가</a>
+  <header class="site-header">
+    <a class="logo" href="index.html">🗂️ 브랜드 허브</a>
+    <nav>
+      <a class="btn" href="settings.html">⚙️ 설정</a>
+      <a class="btn btn-primary" href="add-brand.html">+ 브랜드 추가</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-title-row">
+      <h1>내 브랜드 목록</h1>
     </div>
-  </div>
-</header>
+    <div id="brand-list" class="brand-grid">
+      <p class="empty-msg">불러오는 중...</p>
+    </div>
+  </main>
 
-<main class="container">
-  <p class="lead">내가 기획한 브랜드들을 한 곳에서 정리하고 관리하는 페이지입니다.</p>
-  <div id="brand-grid" class="brand-grid">
-    <p class="empty-msg">불러오는 중...</p>
-  </div>
-</main>
-
-<footer class="footer">
-  <p>브랜드 데이터는 <code>data/brands/</code> 폴더의 JSON 파일로 관리되며, 등록/수정 시 GitHub 저장소에 바로 반영됩니다.</p>
-</footer>
-
-<script src="assets/js/index.js"></script>
+  <script src="assets/js/index.js"></script>
 </body>
 </html>
