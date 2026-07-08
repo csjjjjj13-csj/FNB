@@ -37,9 +37,10 @@ function b64DecodeUnicode(str) {
 }
 
 // GET the raw file record (sha + base64 content) from the repo. Returns null if it doesn't exist yet.
+// Always bypasses HTTP caching so we never work off a stale sha (which causes 409 "does not match" errors on save).
 async function ghGetFileRaw(cfg, path) {
-  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch || 'main')}`;
-  const res = await fetch(url, { headers: ghAuthHeaders(cfg) });
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch || 'main')}&_=${Date.now()}`;
+  const res = await fetch(url, { headers: ghAuthHeaders(cfg), cache: 'no-store' });
   if (res.status === 404) return null;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -72,7 +73,9 @@ async function ghPutFileRaw(cfg, path, base64Content, message, sha) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `GitHub 저장에 실패했습니다 (${res.status})`);
+    const e = new Error(err.message || `GitHub 저장에 실패했습니다 (${res.status})`);
+    e.status = res.status;
+    throw e;
   }
   return res.json();
 }
@@ -82,10 +85,26 @@ async function ghPutFile(cfg, path, contentText, message, sha) {
   return ghPutFileRaw(cfg, path, b64EncodeUnicode(contentText), message, sha);
 }
 
+// Create or update a text file, automatically re-fetching the sha and retrying once
+// if GitHub rejects the write because our sha was stale (409 conflict). This is the
+// safe entry point to use whenever you're not 100% sure your sha is fresh.
+async function ghPutTextSmart(cfg, path, contentText, message) {
+  let existing = await ghGetFileRaw(cfg, path);
+  try {
+    return await ghPutFileRaw(cfg, path, b64EncodeUnicode(contentText), message, existing ? existing.sha : undefined);
+  } catch (e) {
+    if (e.status === 409) {
+      existing = await ghGetFileRaw(cfg, path);
+      return await ghPutFileRaw(cfg, path, b64EncodeUnicode(contentText), message, existing ? existing.sha : undefined);
+    }
+    throw e;
+  }
+}
+
 // quick check that owner/repo/token are valid and writable
 async function ghTestConnection(cfg) {
   const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}`;
-  const res = await fetch(url, { headers: ghAuthHeaders(cfg) });
+  const res = await fetch(url, { headers: ghAuthHeaders(cfg), cache: 'no-store' });
   if (res.status === 404) throw new Error('저장소를 찾을 수 없습니다. 아이디/저장소 이름을 확인하세요.');
   if (res.status === 401) throw new Error('토큰이 유효하지 않습니다.');
   if (!res.ok) throw new Error(`연결 실패 (${res.status})`);

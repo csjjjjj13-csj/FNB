@@ -366,15 +366,16 @@ async function submitBrand(isEdit) {
 
   try {
     const filePath = `data/brands/${data.slug}.json`;
-    const existingFile = await ghGetFile(cfg, filePath);
-    if (!isEdit && existingFile) {
-      throw new Error('이미 같은 슬러그의 브랜드가 있습니다. 슬러그를 다르게 입력해주세요.');
+
+    if (!isEdit) {
+      const already = await ghGetFileRaw(cfg, filePath);
+      if (already) throw new Error('이미 같은 슬러그의 브랜드가 있습니다. 슬러그를 다르게 입력해주세요.');
     }
-    await ghPutFile(
-      cfg, filePath, JSON.stringify(data, null, 2),
-      isEdit ? `브랜드 수정: ${data.name}` : `새 브랜드 추가: ${data.name}`,
-      existingFile ? existingFile.sha : undefined
-    );
+
+    // ghPutTextSmart always fetches a fresh sha right before writing (and retries
+    // once if GitHub still rejects it as stale), so this is safe even right after
+    // an image upload touched other files in the repo.
+    await ghPutTextSmart(cfg, filePath, JSON.stringify(data, null, 2), isEdit ? `브랜드 수정: ${data.name}` : `새 브랜드 추가: ${data.name}`);
 
     // update index.json
     const idxPath = 'data/brands/index.json';
@@ -390,7 +391,7 @@ async function submitBrand(isEdit) {
     };
     const pos = idxArr.findIndex(b => b.slug === data.slug);
     if (pos >= 0) idxArr[pos] = entry; else idxArr.push(entry);
-    await ghPutFile(cfg, idxPath, JSON.stringify(idxArr, null, 2), `브랜드 목록 업데이트: ${data.name}`, idxFile ? idxFile.sha : undefined);
+    await ghPutTextSmart(cfg, idxPath, JSON.stringify(idxArr, null, 2), `브랜드 목록 업데이트: ${data.name}`);
 
     // instant local cache so the next page shows the fresh data right away,
     // without waiting for GitHub Pages to rebuild.
