@@ -57,7 +57,7 @@ async function ghGetFile(cfg, path) {
   return { sha: json.sha, text };
 }
 
-// Create or update a file from an already-base64-encoded payload (used for binary files like images).
+// Create or update a file from an already-base64-encoded payload (used for binary files like images/PPT).
 async function ghPutFileRaw(cfg, path, base64Content, message, sha) {
   const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
   const body = {
@@ -115,7 +115,7 @@ async function ghTestConnection(cfg) {
   return json;
 }
 
-// ---- image upload helper ----
+// ---- file upload helpers ----
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -134,7 +134,7 @@ function sanitizeFileName(name) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
   const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';
-  return `${Date.now()}-${base || 'image'}${ext}`;
+  return `${Date.now()}-${base || 'file'}${ext}`;
 }
 
 // Uploads an image file to images/{slug}/{filename} in the repo and returns the relative path.
@@ -150,5 +150,25 @@ async function uploadImageFile(file, slug) {
   const path = `images/${slug}/${filename}`;
   const existing = await ghGetFileRaw(cfg, path);
   await ghPutFileRaw(cfg, path, base64, `이미지 업로드: ${path}`, existing ? existing.sha : undefined);
+  return path;
+}
+
+// Uploads a PPT file to files/{slug}/{filename} in the repo and returns the relative path.
+// Anyone who visits the published GitHub Pages site can then download it via a plain link.
+async function uploadPresentationFile(file, slug) {
+  const cfg = getGithubConfig();
+  if (!cfg) throw new Error('먼저 GitHub 연결 설정을 해주세요.');
+  if (!slug) throw new Error('브랜드명(슬러그)을 먼저 입력해주세요.');
+  const validExt = ['.ppt', '.pptx'];
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot > 0 ? file.name.slice(dot).toLowerCase() : '';
+  if (!validExt.includes(ext)) throw new Error('PPT 파일(.ppt 또는 .pptx)만 업로드할 수 있어요.');
+  if (file.size > 25 * 1024 * 1024) throw new Error('25MB 이하 PPT 파일만 업로드할 수 있어요.');
+
+  const base64 = await fileToBase64(file);
+  const filename = sanitizeFileName(file.name);
+  const path = `files/${slug}/${filename}`;
+  const existing = await ghGetFileRaw(cfg, path);
+  await ghPutFileRaw(cfg, path, base64, `PPT 업로드: ${path}`, existing ? existing.sha : undefined);
   return path;
 }

@@ -5,6 +5,7 @@ const main = document.getElementById('brand-main');
 const TABS = [
   { id: 'overview', label: '개요' },
   { id: 'logoimages', label: '로고·이미지' },
+  { id: 'presentations', label: '발표자료' },
   { id: 'colors', label: '브랜드컬러' },
   { id: 'copy', label: '카피문구' },
   { id: 'menu', label: '메뉴라인업' },
@@ -32,6 +33,24 @@ function calcRow(price, cost) {
   const marginRate = p ? (margin / p) * 100 : 0;
   return { price: p, cost: c, margin, costRate, marginRate };
 }
+
+// A freshly-uploaded image may 404 for a little while until GitHub Pages
+// finishes rebuilding and publishing it. Instead of giving up immediately,
+// retry a few times with growing delays before showing a "not found" message.
+window.__imgRetry = function (imgEl, originalSrc, attempt) {
+  attempt = attempt || 1;
+  if (attempt > 5) {
+    const span = document.createElement('span');
+    span.className = 'hint';
+    span.textContent = '이미지를 아직 불러올 수 없습니다. 방금 올린 이미지라면 GitHub Pages가 반영될 때까지 1~2분 정도 걸릴 수 있어요. 잠시 후 새로고침 해보세요.';
+    imgEl.replaceWith(span);
+    return;
+  }
+  setTimeout(() => {
+    imgEl.onerror = () => window.__imgRetry(imgEl, originalSrc, attempt + 1);
+    imgEl.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+  }, attempt * 3000);
+};
 
 async function init() {
   if (!slug) {
@@ -86,6 +105,7 @@ function render(brand) {
     <div id="panels">
       <section class="tab-panel active" data-panel="overview">${renderOverview(brand)}</section>
       <section class="tab-panel" data-panel="logoimages">${renderLogoImages(brand)}</section>
+      <section class="tab-panel" data-panel="presentations">${renderPresentations(brand)}</section>
       <section class="tab-panel" data-panel="colors">${renderColors(brand)}</section>
       <section class="tab-panel" data-panel="copy">${renderCopy(brand)}</section>
       <section class="tab-panel" data-panel="menu">${renderMenu(brand)}</section>
@@ -145,7 +165,7 @@ function renderLogoImages(b) {
     html += `
       <div class="section-block">
         <h3>로고</h3>
-        <img src="${escapeHtml(logo)}" alt="${escapeHtml(b.name)} 로고" style="max-height:200px;border-radius:8px;margin-top:8px;" onerror="this.replaceWith(document.createTextNode('이미지를 불러오지 못했습니다'))">
+        <img src="${escapeHtml(logo)}" alt="${escapeHtml(b.name)} 로고" style="max-height:200px;border-radius:8px;margin-top:8px;" onerror="window.__imgRetry(this, '${escapeHtml(logo)}')">
       </div>
     `;
   }
@@ -157,7 +177,7 @@ function renderLogoImages(b) {
           ${images.map(im => `
             <div class="menu-card">
               <div class="menu-card-img">
-                ${im.image ? `<img src="${escapeHtml(im.image)}" alt="${escapeHtml(im.caption || '')}" onerror="this.parentElement.innerHTML='이미지 없음'">` : '이미지 없음'}
+                ${im.image ? `<img src="${escapeHtml(im.image)}" alt="${escapeHtml(im.caption || '')}" onerror="window.__imgRetry(this, '${escapeHtml(im.image)}')">` : '이미지 없음'}
               </div>
               ${im.caption ? `<div class="menu-card-body"><div class="desc">${escapeHtml(im.caption)}</div></div>` : ''}
             </div>
@@ -167,6 +187,31 @@ function renderLogoImages(b) {
     `;
   }
   return html;
+}
+
+function fileNameFromPath(path) {
+  try { return decodeURIComponent(String(path).split('/').pop()); }
+  catch (e) { return String(path).split('/').pop(); }
+}
+
+function renderPresentations(b) {
+  const list = b.presentations || [];
+  if (!list.length) return '<p class="empty-msg">등록된 발표자료가 없습니다.</p>';
+  return `
+    <div class="section-block">
+      <h3>발표자료</h3>
+      <ul class="file-list">
+        ${list.map(p => `
+          <li class="file-list-item">
+            <span class="file-list-name">📊 ${escapeHtml(p.title || fileNameFromPath(p.path))}</span>
+            ${p.path
+              ? `<a class="btn btn-sm btn-primary" href="${escapeHtml(p.path)}" download>다운로드</a>`
+              : '<span class="hint">파일 없음</span>'}
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  `;
 }
 
 function renderColors(b) {
@@ -201,7 +246,7 @@ function menuCard(item) {
   return `
     <div class="menu-card">
       <div class="menu-card-img">
-        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" onerror="this.parentElement.innerHTML='이미지 없음'">` : '이미지 없음'}
+        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" onerror="window.__imgRetry(this, '${escapeHtml(item.image)}')">` : '이미지 없음'}
       </div>
       <div class="menu-card-body">
         <h4>${escapeHtml(item.name)}</h4>
@@ -230,7 +275,7 @@ function renderSeason(b) {
     <div class="season-card">
       ${s.period ? `<span class="period">${escapeHtml(s.period)}</span>` : ''}
       <h4>${escapeHtml(s.name)}${s.season ? ` <span style="color:var(--text-muted);font-weight:400;font-size:.85rem;">· ${escapeHtml(s.season)}</span>` : ''}</h4>
-      ${s.image ? `<img src="${escapeHtml(s.image)}" alt="${escapeHtml(s.name)}" style="max-height:180px;object-fit:cover;border-radius:8px;margin:8px 0;" onerror="this.remove()">` : ''}
+      ${s.image ? `<img src="${escapeHtml(s.image)}" alt="${escapeHtml(s.name)}" style="max-height:180px;object-fit:cover;border-radius:8px;margin:8px 0;" onerror="window.__imgRetry(this, '${escapeHtml(s.image)}')">` : ''}
       ${s.desc ? `<p style="margin:0;color:var(--text-muted);">${escapeHtml(s.desc)}</p>` : ''}
     </div>
   `).join('');

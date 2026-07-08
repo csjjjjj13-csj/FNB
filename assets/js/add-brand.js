@@ -68,7 +68,7 @@ function createImageField(containerId, initialValue) {
   return { getValue: () => textInput.value.trim() };
 }
 
-// ---- generic repeatable-row helper (supports text / number / color / textarea / image fields) ----
+// ---- generic repeatable-row helper (supports text / number / color / textarea / image / file fields) ----
 function makeRepeater(containerId, addBtnId, fields, initialRows = []) {
   const container = document.getElementById(containerId);
   let rows = initialRows.length ? initialRows.map(r => ({ ...r })) : [];
@@ -122,12 +122,72 @@ function makeRepeater(containerId, addBtnId, fields, initialRows = []) {
     return wrap;
   }
 
+  function renderFileMiniField(row, f) {
+    const wrap = document.createElement('div');
+    wrap.className = 'file-field-mini';
+
+    const labelEl = document.createElement('label');
+    labelEl.textContent = f.label || '파일';
+
+    const info = document.createElement('div');
+    info.className = 'file-field-info';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = f.placeholder || '파일 경로/URL';
+    input.value = row[f.key] ?? '';
+
+    function refresh() {
+      if (input.value) {
+        const name = decodeURIComponent(input.value.split('/').pop());
+        info.innerHTML = `📄 <a href="${input.value}" target="_blank" rel="noopener">${name}</a>`;
+      } else {
+        info.textContent = '등록된 파일 없음';
+      }
+    }
+    refresh();
+
+    input.addEventListener('input', () => { row[f.key] = input.value; refresh(); });
+
+    const fileLabel = document.createElement('label');
+    fileLabel.className = 'btn btn-sm file-upload-btn';
+    fileLabel.textContent = '파일 선택';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = f.accept || '';
+    fileInput.style.display = 'none';
+    fileLabel.appendChild(fileInput);
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      fileLabel.textContent = '업로드중...';
+      try {
+        const path = await uploadPresentationFile(file, currentSlug());
+        row[f.key] = path;
+        input.value = path;
+        refresh();
+      } catch (e) {
+        alert('파일 업로드 실패: ' + e.message);
+      }
+      fileLabel.textContent = '파일 선택';
+      fileInput.value = '';
+    });
+
+    wrap.append(labelEl, info, input, fileLabel);
+    return wrap;
+  }
+
   function renderRow(row) {
     const div = document.createElement('div');
     div.className = 'repeat-row';
     fields.forEach(f => {
       if (f.type === 'image') {
         div.appendChild(renderImageMiniField(row, f));
+        return;
+      }
+      if (f.type === 'file') {
+        div.appendChild(renderFileMiniField(row, f));
         return;
       }
       const wrap = document.createElement('div');
@@ -202,6 +262,10 @@ const BRANDIMAGE_FIELDS = [
   { key: 'image', label: '이미지', type: 'image' },
   { key: 'caption', label: '설명/캡션', placeholder: '예: 매장 전경' },
 ];
+const PRESENTATION_FIELDS = [
+  { key: 'title', label: '자료명', placeholder: '예: 쟁반집 사업계획서' },
+  { key: 'path', label: 'PPT 파일', type: 'file', accept: '.ppt,.pptx' },
+];
 
 const urlParams = new URLSearchParams(location.search);
 const editSlug = urlParams.get('edit');
@@ -266,6 +330,7 @@ async function init() {
 
   logoField = createImageField('logo-field', existing?.logo || '');
 
+  repeaters.presentations = makeRepeater('presentations-list', 'add-presentation', PRESENTATION_FIELDS, existing?.presentations || []);
   repeaters.brandImages = makeRepeater('brandimages-list', 'add-brandimage', BRANDIMAGE_FIELDS, existing?.brandImages || []);
   repeaters.colors = makeRepeater('colors-list', 'add-color', COLOR_FIELDS,
     existing?.brandColors?.length ? existing.brandColors : [{ name: '', hex: '#8B3A2F', usage: '' }]);
@@ -303,6 +368,7 @@ function buildBrandData() {
     createdAt: editSlug ? existingCreatedAt : new Date().toISOString().slice(0, 10),
     logo: logoField ? logoField.getValue() : '',
     brandImages: repeaters.brandImages ? repeaters.brandImages.getRows() : [],
+    presentations: repeaters.presentations ? repeaters.presentations.getRows() : [],
     overview: {
       oneLiner: document.getElementById('f-oneliner').value.trim(),
       story: document.getElementById('f-story').value.trim(),
@@ -374,7 +440,7 @@ async function submitBrand(isEdit) {
 
     // ghPutTextSmart always fetches a fresh sha right before writing (and retries
     // once if GitHub still rejects it as stale), so this is safe even right after
-    // an image upload touched other files in the repo.
+    // an image/PPT upload touched other files in the repo.
     await ghPutTextSmart(cfg, filePath, JSON.stringify(data, null, 2), isEdit ? `브랜드 수정: ${data.name}` : `새 브랜드 추가: ${data.name}`);
 
     // update index.json
