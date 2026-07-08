@@ -256,6 +256,11 @@ tfoot td { font-weight: 700; }
 .field-row textarea { min-height: 90px; resize: vertical; }
 .field-row input[type=color] { width: 60px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; }
 
+/* Tabbed form panels (add-brand.html). Without these two rules every panel
+   stacks and shows at once instead of only the active tab. */
+.form-panel { display: none; }
+.form-panel.active { display: block; }
+
 .repeater-row {
   border: 1px solid var(--border);
   border-radius: 10px;
