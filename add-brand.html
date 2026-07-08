@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>새 브랜드 추가 - 브랜드 허브</title>
+<title id="doc-title">새 브랜드 추가 - 브랜드 허브</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 <header class="topbar">
   <div class="topbar-inner">
     <a href="index.html" class="logo">← 브랜드 허브</a>
+    <a href="settings.html" class="btn btn-sm">⚙ GitHub 연결</a>
   </div>
 </header>
 
 <main class="container">
-  <h1>새 브랜드 추가</h1>
-  <p class="lead">폼을 채우면 브랜드 데이터 JSON 파일을 만들어줍니다. 이 사이트는 서버가 없기 때문에,
-  다운로드한 파일을 직접 <code>data/brands/</code> 폴더에 넣고 GitHub에 올려야 실제로 반영됩니다.</p>
+  <h1 id="page-heading">새 브랜드 추가</h1>
+  <div id="gh-banner"></div>
 
   <div class="form-section">
     <h2>1. 기본 정보</h2>
@@ -26,7 +26,7 @@
       <div class="field"><label>대표 컬러</label><input id="f-color" type="color" value="#8B3A2F"></div>
       <div class="field"><label>한 줄 태그라인</label><input id="f-tagline" placeholder="예: 오늘, 맛있는 한 쟁반."></div>
     </div>
-    <p class="hint">슬러그는 URL과 파일명에 쓰입니다. 영문 소문자와 하이픈만 사용하세요. 브랜드명을 입력하면 자동으로 채워집니다.</p>
+    <p class="hint">슬러그는 URL과 파일명에 쓰입니다. 브랜드명을 입력하면 자동으로 채워집니다. (수정 화면에서는 슬러그를 바꿀 수 없습니다.)</p>
   </div>
 
   <div class="form-section">
@@ -79,19 +79,24 @@
 
   <div class="form-section">
     <h2>9. 저장하기</h2>
-    <div class="step"><div class="step-num">1</div><div>아래 버튼으로 JSON 내용을 확인하고 다운로드하세요.</div></div>
-    <div class="step"><div class="step-num">2</div><div>다운로드된 파일을 <code>data/brands/</code> 폴더에 넣으세요.</div></div>
-    <div class="step"><div class="step-num">3</div><div>"index.json에 추가할 코드 복사"로 복사한 내용을 <code>data/brands/index.json</code> 배열에 붙여넣으세요.</div></div>
-    <div class="step"><div class="step-num">4</div><div>git add, commit, push 하면 사이트에 새 브랜드가 나타납니다.</div></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-      <button class="btn" id="btn-preview">JSON 미리보기</button>
-      <button class="btn btn-primary" id="btn-download">JSON 다운로드</button>
-      <button class="btn" id="btn-copy-index">index.json에 추가할 코드 복사</button>
-    </div>
-    <pre id="json-preview" style="display:none;margin-top:14px;"></pre>
+    <p class="hint">버튼을 누르면 GitHub 저장소에 바로 커밋됩니다. 몇 초~1분 정도 후 실제 사이트에도 반영돼요 (저장 직후에는 미리보기로 바로 확인할 수 있어요).</p>
+    <button class="btn btn-primary" id="submit-btn" style="font-size:1rem;padding:12px 24px;">브랜드 등록하기</button>
+    <p id="submit-status" class="submit-status"></p>
+
+    <details class="advanced">
+      <summary>고급: JSON 파일로 직접 내보내기 (GitHub 자동 저장이 안 될 때 백업용)</summary>
+      <div class="adv-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" id="btn-preview">JSON 미리보기</button>
+          <button class="btn" id="btn-download">JSON 다운로드</button>
+        </div>
+        <pre id="json-preview" style="display:none;margin-top:14px;"></pre>
+      </div>
+    </details>
   </div>
 </main>
 
+<script src="assets/js/github-api.js"></script>
 <script src="assets/js/add-brand.js"></script>
 </body>
 </html>

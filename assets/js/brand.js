@@ -37,6 +37,20 @@ async function init() {
     main.innerHTML = '<p class="empty-msg">브랜드가 지정되지 않았습니다. <a href="index.html">목록으로 돌아가기</a></p>';
     return;
   }
+
+  // instant-view cache: right after add/edit we stash the fresh data here so
+  // the page shows it immediately without waiting for GitHub Pages to rebuild.
+  const cacheKey = `brand-cache-${slug}`;
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const brand = JSON.parse(cached);
+      sessionStorage.removeItem(cacheKey);
+      render(brand);
+      return;
+    } catch (e) { /* fall through to fetch */ }
+  }
+
   try {
     const res = await fetch(`data/brands/${encodeURIComponent(slug)}.json`, { cache: 'no-store' });
     if (!res.ok) throw new Error('brand json not found');
@@ -54,11 +68,14 @@ function render(brand) {
 
   main.innerHTML = `
     <div class="brand-hero" style="--brand-color:${escapeHtml(color)}">
-      <h1>${escapeHtml(brand.name)}</h1>
-      <p class="tagline">${escapeHtml(brand.tagline || '')}</p>
-      <div class="swatches">
-        ${(brand.brandColors || []).map(c => `<div class="swatch-dot" title="${escapeHtml(c.name)}" style="background:${escapeHtml(c.hex)}"></div>`).join('')}
+      <div>
+        <h1>${escapeHtml(brand.name)}</h1>
+        <p class="tagline">${escapeHtml(brand.tagline || '')}</p>
+        <div class="swatches">
+          ${(brand.brandColors || []).map(c => `<div class="swatch-dot" title="${escapeHtml(c.name)}" style="background:${escapeHtml(c.hex)}"></div>`).join('')}
+        </div>
       </div>
+      <a class="btn btn-sm" href="add-brand.html?edit=${encodeURIComponent(brand.slug)}">✏️ 수정하기</a>
     </div>
 
     <div class="tabs" id="tabs">

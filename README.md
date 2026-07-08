@@ -1,18 +1,20 @@
 # 브랜드 허브
 
 내가 기획한 브랜드(개요 / 브랜드컬러 / 카피문구 / 메뉴라인업 / 시즌메뉴 / 이벤트 / 코스트 계산기)를
-한 곳에서 정리하는 정적 웹사이트입니다. 서버·DB 없이 GitHub Pages로 바로 호스팅할 수 있습니다.
+한 곳에서 정리하는 정적 웹사이트입니다. GitHub Pages로 호스팅하고, 브랜드를 등록/수정하면
+사이트에서 바로 GitHub 저장소에 커밋됩니다.
 
 ## 폴더 구조
 
 ```
-brand-hub/
+(저장소 루트)/
 ├─ index.html            브랜드 목록(홈)
 ├─ brand.html            브랜드 상세 페이지 (탭: 개요/컬러/카피/메뉴/시즌메뉴/이벤트/코스트계산기)
-├─ add-brand.html        새 브랜드 등록 폼 (JSON 파일 생성)
+├─ add-brand.html        브랜드 등록/수정 폼
+├─ settings.html         GitHub 연결 설정
 ├─ assets/
 │  ├─ css/style.css
-│  └─ js/ (index.js, brand.js, add-brand.js)
+│  └─ js/ (index.js, brand.js, add-brand.js, settings.js, github-api.js)
 ├─ data/
 │  └─ brands/
 │     ├─ index.json      전체 브랜드 목록(요약 정보)
@@ -23,27 +25,33 @@ brand-hub/
 
 ## GitHub Pages로 배포하기
 
-1. 이 폴더(`brand-hub` 안의 내용물)를 새 GitHub 저장소 루트에 올립니다.
-   (`index.html`이 저장소 최상위에 오도록 올리는 게 가장 간단합니다.)
+1. 이 폴더 안의 내용물을 GitHub 저장소 루트에 올립니다. (`index.html`이 저장소 최상위에 오도록.)
 2. 저장소의 **Settings → Pages** 로 이동합니다.
-3. **Source**를 `Deploy from a branch`로 설정하고, 브랜치는 `main`, 폴더는 `/root`를 선택합니다.
-4. 몇 분 후 `https://아이디.github.io/저장소이름/` 주소로 접속하면 사이트가 보입니다.
-5. 이후 파일을 수정하고 `git add`, `git commit`, `git push` 하면 자동으로 반영됩니다.
+3. **Source**를 `Deploy from a branch`로, 브랜치는 `main`, 폴더는 `/root`로 설정합니다.
+4. 몇 분 후 `https://아이디.github.io/저장소이름/` 주소로 사이트가 보입니다.
 
-## 새 브랜드 추가하는 방법
+## GitHub 연결 설정 (최초 1회)
 
-### 방법 A. 폼으로 만들기 (추천)
-1. 사이트에서 **"+ 새 브랜드 추가"** 버튼을 눌러 `add-brand.html`로 이동합니다.
-2. 개요 / 브랜드컬러 / 카피문구 / 점심·저녁 메뉴 / 시즌메뉴 / 이벤트를 입력합니다.
-3. 하단 **"JSON 미리보기"** 로 내용을 확인하고 **"JSON 다운로드"** 를 누릅니다.
-4. 다운로드된 `브랜드슬러그.json` 파일을 `data/brands/` 폴더에 넣습니다.
-5. **"index.json에 추가할 코드 복사"** 버튼을 눌러 복사한 내용을 `data/brands/index.json` 배열 안에 붙여넣습니다.
-6. (선택) 메뉴 이미지를 `images/브랜드슬러그/` 폴더에 넣고, 폼의 이미지 항목에 `images/브랜드슬러그/파일명.jpg` 경로를 입력하거나, 외부 이미지 URL을 바로 입력해도 됩니다.
-7. `git add . && git commit -m "새 브랜드 추가" && git push` 로 반영합니다.
+브랜드를 등록/수정하면 사이트가 자동으로 저장소에 커밋하도록 하려면, 먼저 개인 액세스 토큰을 연결해야 합니다.
 
-### 방법 B. JSON 파일을 직접 작성하기
-`data/brands/jaengban-jip.json` 파일을 복사해서 내용을 채운 뒤, `data/brands/index.json`에
-`{ "slug": "...", "name": "...", "tagline": "...", "color": "#000000", "summary": "..." }` 형태로 한 줄 추가하면 됩니다.
+1. 사이트에서 **⚙ GitHub 연결** 버튼을 눌러 `settings.html`로 이동합니다.
+2. [github.com/settings/tokens](https://github.com/settings/tokens?type=beta) 에서 "Generate new token"으로 Fine-grained token을 만듭니다.
+   - Repository access → Only select repositories → 이 사이트가 올라간 저장소 선택
+   - Permissions → Repository permissions → **Contents: Read and write**
+3. 생성된 토큰을 복사해서 설정 화면의 아이디 / 저장소 이름 / 브랜치 / 토큰 입력칸에 넣고 "연결 테스트" → "저장하기"를 누릅니다.
+
+⚠️ 토큰은 사용 중인 브라우저의 localStorage에만 저장됩니다. 본인만 쓰는 컴퓨터에서 사용하세요.
+공용 컴퓨터라면 설정 화면의 "연결 정보 삭제" 버튼으로 사용 후 지워주세요.
+
+## 브랜드 등록 / 수정하는 방법
+
+1. **+ 새 브랜드 추가**를 눌러 개요 / 브랜드컬러 / 카피문구 / 점심·저녁 메뉴 / 시즌메뉴 / 이벤트를 입력합니다.
+2. **브랜드 등록하기** 버튼을 누르면 바로 GitHub 저장소에 `data/brands/브랜드슬러그.json`이 생성되고, `data/brands/index.json`도 자동으로 업데이트됩니다.
+3. 저장 직후 브랜드 상세 페이지로 이동하는데, 이때는 방금 저장한 내용을 바로 미리 보여줍니다. 실제 배포된 사이트(다른 브라우저/기기)에는 GitHub Pages가 다시 빌드되는 몇 초~1분 정도 후 반영됩니다.
+4. 이미 등록한 브랜드는 상세 페이지의 **✏️ 수정하기** 버튼으로 들어가서 내용을 바꾸고 저장하면 같은 방식으로 바로 반영됩니다. (수정 화면에서는 슬러그는 바꿀 수 없습니다.)
+5. (선택) 메뉴 이미지는 `images/브랜드슬러그/` 폴더에 직접 올리고 경로를 입력하거나, 외부 이미지 URL을 바로 입력해도 됩니다. 이미지 파일 자체는 이 사이트에서 업로드되지 않으니, 저장소에 미리 넣어두거나 외부 URL을 쓰세요.
+
+GitHub 연결이 안 되어 있거나 문제가 생기면, 등록 화면 하단의 "고급: JSON 파일로 직접 내보내기"에서 JSON을 다운로드해 수동으로 `data/brands/`에 넣는 방법도 여전히 사용할 수 있습니다.
 
 ## 코스트 계산기
 
@@ -56,11 +64,8 @@ brand-hub/
 
 ## 로컬에서 미리보기
 
-정적 파일이라도 `fetch`로 JSON을 불러오기 때문에 `file://`로 그냥 열면 브라우저 보안 정책에 막힐 수 있습니다.
-아래처럼 간단한 로컬 서버로 확인하세요.
-
 ```bash
-cd brand-hub
+cd (이 폴더)
 python3 -m http.server 8080
 # 브라우저에서 http://localhost:8080 접속
 ```
