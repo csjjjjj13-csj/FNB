@@ -101,6 +101,21 @@ async function ghPutTextSmart(cfg, path, contentText, message) {
   }
 }
 
+// Delete a file from the repo. sha must be the file's current sha (fetch it first).
+async function ghDeleteFile(cfg, path, sha, message) {
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { ...ghAuthHeaders(cfg), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sha, branch: cfg.branch || 'main' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub에서 파일을 삭제하지 못했습니다 (${res.status})`);
+  }
+  return res.json();
+}
+
 // quick check that owner/repo/token are valid and writable
 async function ghTestConnection(cfg) {
   const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}`;

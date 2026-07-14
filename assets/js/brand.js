@@ -99,7 +99,24 @@ async function init() {
       sessionStorage.removeItem(cacheKey);
       render(brand);
       return;
-    } catch (e) { /* fall through to fetch */ }
+    } catch (e) { /* fall through */ }
+  }
+
+  // If GitHub credentials are configured, read straight from the API so this
+  // always reflects the latest commit rather than whatever GitHub Pages has
+  // managed to rebuild and publish so far (that lag is what previously made
+  // recent edits look "reverted").
+  const cfg = getGithubConfig();
+  if (cfg) {
+    try {
+      const file = await ghGetFile(cfg, `data/brands/${slug}.json`);
+      if (file) {
+        render(JSON.parse(file.text));
+        return;
+      }
+    } catch (e) {
+      console.error('GitHub API 조회 실패, 배포된 사이트 데이터로 대체합니다.', e);
+    }
   }
 
   try {
@@ -109,6 +126,39 @@ async function init() {
     render(brand);
   } catch (e) {
     main.innerHTML = `<p class="empty-msg">브랜드 데이터를 불러오지 못했습니다. (data/brands/${escapeHtml(slug)}.json 확인) <br><a href="index.html">목록으로 돌아가기</a></p>`;
+    console.error(e);
+  }
+}
+
+async function deleteThisBrand(brand) {
+  const cfg = getGithubConfig();
+  if (!cfg) {
+    alert('먼저 설정 페이지에서 GitHub 연결 정보를 저장해주세요.');
+    return;
+  }
+  if (!confirm(`"${brand.name}" 브랜드를 삭제할까요?\n브랜드 데이터가 저장소에서 삭제되며 되돌릴 수 없습니다.\n(업로드된 이미지·PPT 파일은 함께 삭제되지 않습니다.)`)) {
+    return;
+  }
+  try {
+    const brandPath = `data/brands/${brand.slug}.json`;
+    const existing = await ghGetFileRaw(cfg, brandPath);
+    if (existing) {
+      await ghDeleteFile(cfg, brandPath, existing.sha, `브랜드 삭제: ${brand.name}`);
+    }
+
+    const idxPath = 'data/brands/index.json';
+    const idxExisting = await ghGetFile(cfg, idxPath);
+    let indexArr = [];
+    if (idxExisting) {
+      try { indexArr = JSON.parse(idxExisting.text); } catch (e) { indexArr = []; }
+    }
+    indexArr = indexArr.filter(b => b.slug !== brand.slug);
+    await ghPutTextSmart(cfg, idxPath, JSON.stringify(indexArr, null, 2), `브랜드 목록 갱신 (삭제): ${brand.name}`);
+
+    sessionStorage.setItem('index-cache', JSON.stringify(indexArr));
+    location.href = 'index.html';
+  } catch (e) {
+    alert('삭제 실패: ' + e.message);
     console.error(e);
   }
 }
@@ -126,7 +176,10 @@ function render(brand) {
           ${(brand.brandColors || []).map(c => `<div class="swatch-dot" title="${escapeHtml(c.name)}" style="background:${escapeHtml(c.hex)}"></div>`).join('')}
         </div>
       </div>
-      <a class="btn btn-sm" href="add-brand.html?edit=${encodeURIComponent(brand.slug)}">✏️ 수정하기</a>
+      <div class="hero-actions">
+        <a class="btn btn-sm" href="add-brand.html?edit=${encodeURIComponent(brand.slug)}">✏️ 수정하기</a>
+        <button type="button" class="btn btn-sm btn-danger" id="delete-brand-btn">🗑️ 삭제</button>
+      </div>
     </div>
 
     <div class="tabs" id="tabs">
@@ -154,6 +207,8 @@ function render(brand) {
     btn.classList.add('active');
     document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
   });
+
+  document.getElementById('delete-brand-btn').addEventListener('click', () => deleteThisBrand(brand));
 
   document.querySelectorAll('.color-card').forEach(card => {
     card.addEventListener('click', () => {

@@ -444,9 +444,27 @@ async function init() {
     document.getElementById('page-title').textContent = '브랜드 수정';
     document.getElementById('f-slug').disabled = true;
     try {
-      const res = await fetch(`data/brands/${encodeURIComponent(editSlug)}.json`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('brand not found');
-      const brand = await res.json();
+      // IMPORTANT: read the brand data straight from the GitHub API (the real,
+      // current commit) rather than fetch()-ing the published GitHub Pages
+      // copy. Pages can take anywhere from a few seconds to a couple of
+      // minutes to rebuild after a save. If you saved once, then reopened
+      // "edit" before Pages caught up, the old code would load the OLD/partial
+      // data into this form — and saving again would silently overwrite your
+      // most recent changes with that stale snapshot. That was the root cause
+      // of "등록하면 하나가 사라진다" (registering one thing makes another
+      // disappear). Reading via the API guarantees we always start from the
+      // true latest data.
+      const cfg = getGithubConfig();
+      let brand = null;
+      if (cfg) {
+        const file = await ghGetFile(cfg, `data/brands/${editSlug}.json`);
+        if (file) brand = JSON.parse(file.text);
+      }
+      if (!brand) {
+        const res = await fetch(`data/brands/${encodeURIComponent(editSlug)}.json`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('brand not found');
+        brand = await res.json();
+      }
       window.__existingBrand = brand;
       fillBasicFields(brand);
       setupLogoField(brand.logo);

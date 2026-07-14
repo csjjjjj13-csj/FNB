@@ -68,6 +68,8 @@ a { color: inherit; }
 }
 .btn-primary:hover { opacity: 0.9; background: var(--brand-color, #8B3A2F); }
 .btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.btn-danger { color: #c0392b; border-color: #f0d3ce; }
+.btn-danger:hover { background: #fdf1ef; }
 
 /* ---- brand list (index) ---- */
 .page-title-row {
@@ -83,6 +85,7 @@ a { color: inherit; }
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 18px;
 }
+.brand-card-wrap { position: relative; }
 .brand-card {
   display: block;
   background: var(--surface);
@@ -103,6 +106,25 @@ a { color: inherit; }
 .brand-card h3 { margin: 0 0 4px; font-size: 1.15rem; }
 .brand-card p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 
+.brand-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  z-index: 2;
+}
+.brand-delete-btn:hover { background: #fdf1ef; color: #c0392b; border-color: #f0d3ce; }
+
 .empty-msg { color: var(--text-muted); padding: 20px 0; }
 
 /* ---- brand detail ---- */
@@ -119,6 +141,7 @@ a { color: inherit; }
 }
 .brand-hero h1 { margin: 0 0 6px; }
 .brand-hero .tagline { margin: 0 0 10px; color: var(--text-muted); }
+.brand-hero .hero-actions { display: flex; gap: 8px; }
 .swatches { display: flex; gap: 6px; }
 .swatch-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); }
 
